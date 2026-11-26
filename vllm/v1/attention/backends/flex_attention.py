@@ -392,6 +392,7 @@ class FlexAttentionMetadata:
     persistent_kv_indices: torch.Tensor
     persistent_kv_num_blocks: torch.Tensor
     persistent_doc_ids: torch.Tensor
+    persistent_sliding_window: torch.Tensor
 
     # For logging.
     num_input_tokens: int = 0  # Number of tokens including padding.
@@ -855,7 +856,8 @@ class FlexAttentionMetadata:
         copy_to_persistent(self.persistent_doc_ids, self.doc_ids)
         self.num_blocks = self.total_cache_tokens // self.block_size
 
-        self._sliding_window_tensor = self.seq_lens.new_tensor(self._effective_window())
+        self._sliding_window_tensor = self.persistent_sliding_window
+        self._sliding_window_tensor.fill_(self._effective_window())
         self.mask_mod = self.get_mask_mod()
         self.transformed_score_mod = self.get_transformed_score_mod()
 
@@ -941,6 +943,9 @@ class FlexAttentionMetadataBuilder(AttentionMetadataBuilder[FlexAttentionMetadat
             )
         self.persistent_doc_ids = torch.empty(
             max_num_batched_tokens, dtype=torch.int32, device=device
+        )
+        self.persistent_sliding_window = torch.empty(
+            (), dtype=torch.int32, device=device
         )
 
         # initialize later when we can access block_table
@@ -1163,6 +1168,7 @@ class FlexAttentionMetadataBuilder(AttentionMetadataBuilder[FlexAttentionMetadat
             persistent_kv_indices=persistent_kv_indices,
             persistent_kv_num_blocks=persistent_kv_num_blocks,
             persistent_doc_ids=self.persistent_doc_ids,
+            persistent_sliding_window=self.persistent_sliding_window,
             mm_prefix_range=common_attn_metadata.mm_req_doc_ranges,
             rswa_prefix_lens=rswa_prefix_lens,
             rswa_window=self.rswa_window,
